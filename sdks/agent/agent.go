@@ -11,10 +11,11 @@ import (
 )
 
 type Client struct {
-	baseURL string
-	client  *httpx.Client
-	headers map[string]string
-	timeout time.Duration
+	baseURL  string
+	client   *httpx.Client
+	headers  map[string]string
+	timeout  time.Duration
+	printLog bool
 }
 
 type Option func(*Client)
@@ -52,6 +53,12 @@ func WithTimeoutSecond(timeoutSecond int) Option {
 	}
 }
 
+func WithPrintLog(printLog bool) Option {
+	return func(c *Client) {
+		c.printLog = printLog
+	}
+}
+
 func NewClient(baseURL string, opts ...Option) *Client {
 	baseUrl := strings.TrimRight(baseURL, "/")
 	client := &Client{
@@ -76,8 +83,8 @@ func (c *Client) Execute(req *AppExecuteRequest) (string, error) {
 		httpx.WithPath("/api/v1/app_execute"),
 		httpx.WithHeaders(headers),
 		httpx.WithBody(req),
+		httpx.WithPrintLog(c.printLog),
 		httpx.WithMethodPost(),
-		httpx.WithPrintLog(true),
 	)
 	err := c.client.DoWithPtr(opts, &out)
 	if err != nil {
@@ -104,9 +111,9 @@ func (c *Client) Stream(req *AppStreamRequest, handler func(chunk SseMessage) er
 	opts := httpx.NewOptions(
 		httpx.WithPath("/api/v1/app_execute"),
 		httpx.WithHeaders(headers),
+		httpx.WithPrintLog(c.printLog),
 		httpx.WithBody(req),
 		httpx.WithMethodPost(),
-		httpx.WithPrintLog(true),
 	)
 	response, err := c.client.DoRaw(opts)
 	if err != nil {
@@ -166,4 +173,79 @@ func consumeSSEMessage(reader io.Reader, handler func(chunk SseMessage) error) e
 		return fmt.Errorf("sdk.stream: read sse stream: %w", err)
 	}
 	return flush()
+}
+
+func (c *Client) AppSessions(appId, userId int64, dataType, dataObjectId string) ([]AppSession, error) {
+	var out Response[[]AppSession]
+	headers := make(map[string]string, len(c.headers))
+	for key, value := range c.headers {
+		headers[key] = value
+	}
+	opts := httpx.NewOptions(
+		httpx.WithPath("/api/v1/app_sessions"),
+		httpx.WithHeaders(headers),
+		httpx.WithQueryParam("appId", fmt.Sprintf("%d", appId)),
+		httpx.WithQueryParam("userId", fmt.Sprintf("%d", userId)),
+		httpx.WithQueryParam("dataType", dataType),
+		httpx.WithQueryParam("dataObjectId", dataObjectId),
+		httpx.WithPrintLog(c.printLog),
+		httpx.WithMethodGet(),
+	)
+	err := c.client.DoWithPtr(opts, &out)
+	if err != nil {
+		return nil, errors.WithMessage(err, "agent.sdk: execute failed")
+	}
+	if out.Code != 0 {
+		return nil, errors.New(out.Message)
+	}
+	return out.Data, nil
+}
+
+func (c *Client) StandardMessages(sessionId string) ([]StandardMessage, error) {
+	var out Response[[]StandardMessage]
+	headers := make(map[string]string, len(c.headers))
+	for key, value := range c.headers {
+		headers[key] = value
+	}
+	opts := httpx.NewOptions(
+		httpx.WithPath("/api/v1/app_session/messages"),
+		httpx.WithHeaders(headers),
+		httpx.WithQueryParam("sessionId", sessionId),
+		httpx.WithPrintLog(c.printLog),
+		httpx.WithQueryParam("messageFormatType", string(MessageFormatStandard)),
+		httpx.WithMethodGet(),
+	)
+	err := c.client.DoWithPtr(opts, &out)
+	if err != nil {
+		return nil, errors.WithMessage(err, "agent.sdk: execute failed")
+	}
+	if out.Code != 0 {
+		return nil, errors.New(out.Message)
+	}
+	return out.Data, nil
+}
+
+// Messages 获取消息
+func (c *Client) Messages(sessionId string) ([]DataMessage, error) {
+	var out Response[[]DataMessage]
+	headers := make(map[string]string, len(c.headers))
+	for key, value := range c.headers {
+		headers[key] = value
+	}
+	opts := httpx.NewOptions(
+		httpx.WithPath("/api/v1/app_session/messages"),
+		httpx.WithHeaders(headers),
+		httpx.WithQueryParam("sessionId", sessionId),
+		httpx.WithPrintLog(c.printLog),
+		httpx.WithQueryParam("messageFormatType", string(MessageFormatBase)),
+		httpx.WithMethodGet(),
+	)
+	err := c.client.DoWithPtr(opts, &out)
+	if err != nil {
+		return nil, errors.WithMessage(err, "agent.sdk: execute failed")
+	}
+	if out.Code != 0 {
+		return nil, errors.New(out.Message)
+	}
+	return out.Data, nil
 }

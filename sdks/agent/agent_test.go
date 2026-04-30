@@ -1,6 +1,9 @@
 package agent
 
-import "testing"
+import (
+	"github.com/xiehqing/infra/pkg/jsonx"
+	"testing"
+)
 
 func TestClient_Execute(t *testing.T) {
 	client := NewClient("http://127.0.0.1:7799")
@@ -33,4 +36,34 @@ func TestClient_Stream(t *testing.T) {
 		t.Error(err)
 		return
 	}
+}
+
+func TestClient_AppSession(t *testing.T) {
+	client := NewClient("http://127.0.0.1:7799", WithPrintLog(false))
+	messages, err := client.AppSessions(1, 0, "", "")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Log(jsonx.ToJsonIgnoreError(messages))
+}
+
+func TestClient_StandardMessages(t *testing.T) {
+	client := NewClient("http://127.0.0.1:7799", WithPrintLog(false))
+	messages, err := client.StandardMessages("9ec96ef4-3e81-482f-9742-5e2cf79faeaa")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Log(jsonx.ToJsonIgnoreError(messages))
+}
+
+func TestClient_Messages(t *testing.T) {
+	client := NewClient("http://127.0.0.1:7799", WithPrintLog(false))
+	messages, err := client.Messages("9ec96ef4-3e81-482f-9742-5e2cf79faeaa")
+	if err != nil {
+		t.Error(err)
+		return
+	}
+	t.Log(jsonx.ToJsonIgnoreError(messages))
 }
