@@ -15,10 +15,27 @@ import (
 )
 
 type Client struct {
-	baseURL string
-	client  *httpx.Client
-	headers map[string]string
-	timeout time.Duration
+	baseURL  string
+	client   *httpx.Client
+	headers  map[string]string
+	timeout  time.Duration
+	printLog bool
+}
+
+// NewClientWithOption 使用option模式创建客户端
+func NewClientWithOption(option *ClientOption) (*Client, error) {
+	if option.URL == "" {
+		return nil, errors.New("MarkItDown server url is required")
+	}
+	if option.Timeout == 0 {
+		option.Timeout = 1000 * 15
+	}
+	duration := time.Duration(option.Timeout) * time.Millisecond
+	cli := httpx.NewClient(option.URL, duration)
+	return &Client{
+		client:   cli,
+		printLog: option.PrintLog,
+	}, nil
 }
 
 type Option func(*Client)
@@ -56,11 +73,18 @@ func WithHeader(key, value string) Option {
 	}
 }
 
+func WithPrintLog(printLog bool) Option {
+	return func(c *Client) {
+		c.printLog = printLog
+	}
+}
+
 func NewClient(baseURL string, opts ...Option) *Client {
 	baseUrl := strings.TrimRight(baseURL, "/")
 	client := &Client{
-		baseURL: baseUrl,
-		headers: map[string]string{},
+		baseURL:  baseUrl,
+		headers:  map[string]string{},
+		printLog: true,
 	}
 	for _, opt := range opts {
 		opt(client)
@@ -81,13 +105,15 @@ func (c *Client) Convert(path string) (string, error) {
 	defer file.Close()
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
-	defer writer.Close()
 	part, err := writer.CreateFormFile("file", filepath.Base(path))
 	if err != nil {
 		return "", errors.WithMessage(err, "sdk.markitdown: create form file failed")
 	}
 	if _, err = io.Copy(part, file); err != nil {
 		return "", errors.WithMessage(err, "sdk.markitdown: copy file failed")
+	}
+	if err = writer.Close(); err != nil {
+		return "", errors.WithMessage(err, "sdk.markitdown: close multipart writer failed")
 	}
 	headers := make(map[string]string, len(c.headers))
 	for key, value := range c.headers {
@@ -101,7 +127,7 @@ func (c *Client) Convert(path string) (string, error) {
 		httpx.WithHeaders(headers),
 		httpx.WithBody(body.Bytes()),
 		httpx.WithMethodPost(),
-		httpx.WithPrintLog(true),
+		httpx.WithPrintLog(c.printLog),
 	)
 	response, err := c.client.Do(opts)
 	if err != nil {
