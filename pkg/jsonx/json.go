@@ -5,6 +5,10 @@ import (
 	"github.com/xiehqing/infra/pkg/logs"
 )
 
+func IsJSON(s string) bool {
+	return json.Valid([]byte(s))
+}
+
 // ToJson 对象转换为json
 func ToJson(o interface{}) (string, error) {
 	b, err := json.Marshal(o)

@@ -7,6 +7,7 @@ import (
 	"github.com/xiehqing/infra/pkg/ormx"
 	"github.com/xiehqing/infra/pkg/timex"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -118,4 +119,28 @@ func ParsePageable(c *app.RequestContext) (ormx.Pageable, error) {
 		sortOrder = "desc"
 	}
 	return ormx.PageRequest(pageNo, pageSize, sortField, sortOrder), nil
+}
+
+func Required(value string) bool {
+	return strings.TrimSpace(value) != ""
+}
+
+func NormalizeString(value string) string {
+	return strings.TrimSpace(value)
+}
+
+func NormalizeIDs(ids []int64) []int64 {
+	seen := make(map[int64]struct{}, len(ids))
+	result := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		result = append(result, id)
+	}
+	return result
 }

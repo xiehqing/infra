@@ -183,6 +183,54 @@ func PageQuery[T interface{}](tx *gorm.DB, pageable *Pageable, where string, arg
 	return lst, total, nil
 }
 
+// BuildOrder 构建排序
+func BuildOrder(pagination Pagination, allowedSorts map[string]string) string {
+	field, ok := allowedSorts[pagination.SortField]
+	if !ok || field == "" {
+		field = allowedSorts["id"]
+	}
+	if field == "" {
+		return ""
+	}
+
+	order := "desc"
+	if strings.EqualFold(pagination.SortOrder, "asc") {
+		order = "asc"
+	}
+	return field + " " + order
+}
+
+func Paginate[T any](db *gorm.DB, pagination Pagination, allowedSorts map[string]string) (PageResult[T], error) {
+	var result PageResult[T]
+
+	pageNo := pagination.PageNo
+	if pageNo <= 0 {
+		pageNo = 1
+	}
+
+	pageSize := pagination.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if pageSize > 200 {
+		pageSize = 200
+	}
+
+	if err := db.Count(&result.Total).Error; err != nil {
+		return result, err
+	}
+
+	order := BuildOrder(pagination, allowedSorts)
+	if order != "" {
+		db = db.Order(order)
+	}
+
+	result.PageNo = pageNo
+	result.PageSize = pageSize
+	err := db.Offset((pageNo - 1) * pageSize).Limit(pageSize).Find(&result.List).Error
+	return result, err
+}
+
 // Upsert 更新或写入
 func Upsert(db *gorm.DB, obj interface{}) error {
 	val := reflect.ValueOf(obj)
@@ -216,6 +264,21 @@ func GetObjIDs(objs interface{}) []int64 {
 		return ids
 	}
 	return []int64{}
+}
+
+func LikeKeyword(keyword string) string {
+	return "%" + strings.TrimSpace(keyword) + "%"
+}
+
+func KeywordPresent(keyword string) bool {
+	return strings.TrimSpace(keyword) != ""
+}
+
+func NotFoundAsNil(err error) error {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil
+	}
+	return err
 }
 
 // GetObjIDWithField 根据字段获取ids

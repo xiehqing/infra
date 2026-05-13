@@ -150,3 +150,10 @@ type Pagination struct {
 	SortField string `json:"sortField" form:"sortField"`
 	SortOrder string `json:"sortOrder" form:"sortOrder"`
 }
+
+type PageResult[T any] struct {
+	List     []T   `json:"list"`
+	Total    int64 `json:"total"`
+	PageNo   int   `json:"pageNo"`
+	PageSize int   `json:"pageSize"`
+}
